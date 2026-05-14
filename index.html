@@ -87,6 +87,10 @@ hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
           <div>Total Loans</div>
           <h2 id="totalLoans">₱0</h2>
         </div>
+        <div style="background:#6f42c1; color:white; padding:15px; border-radius:8px;">
+          <div>Total Funds</div>
+          <h2 id="totalFunds">₱0</h2>
+        </div>
       </div>
     </div>
 
@@ -296,8 +300,11 @@ function updateDashboard() {
   document.getElementById('totalMembers').textContent = members.length;
   let totalSavings = members.reduce((sum, m) => sum + m.savings, 0);
   let totalLoans = members.reduce((sum, m) => sum + m.loan, 0);
+  let totalFunds = totalSavings + totalLoans;
+  
   document.getElementById('totalSavings').textContent = '₱' + totalSavings.toLocaleString();
   document.getElementById('totalLoans').textContent = '₱' + totalLoans.toLocaleString();
+  document.getElementById('totalFunds').textContent = '₱' + totalFunds.toLocaleString();
 
   let tbody = document.querySelector('#membersTable tbody');
   tbody.innerHTML = '';
@@ -335,8 +342,6 @@ function confirmTransaction() {
   if (!amount || amount <= 0) return showToast('Enter valid amount!');
 
   let m = members[currentTrans.memberIndex];
-  let prevSavings = m.savings;
-  let prevLoan = m.loan;
 
   if (currentTrans.type === 'deposit') {
     m.savings += amount;

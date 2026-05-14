@@ -13,11 +13,13 @@ body {background:#f5f5f5; color:#333;}
 .card {background:#fff; border-radius:12px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
 h1 {text-align:center; color:#ff6b35; margin-bottom:20px;}
 h2 {color:#ff6b35; margin-bottom:15px;}
+h3 {color:#333; margin:15px 0 10px;}
 input, select, button {width:100%; padding:12px; margin:8px 0; border:1px solid #ddd; border-radius:8px; font-size:16px;}
 button {background:#ff6b35; color:white; border:none; cursor:pointer; font-weight:bold;}
 button:hover {background:#e55a2b;}
 .btn-secondary {background:#666;}
 .btn-danger {background:#dc3545;}
+.btn-small {width:auto; padding:5px 10px; font-size:14px;}
 table {width:100%; border-collapse:collapse; margin-top:15px;}
 th, td {padding:12px; text-align:left; border-bottom:1px solid #ddd;}
 th {background:#ff6b35; color:white;}
@@ -29,10 +31,18 @@ th {background:#ff6b35; color:white;}
 .dark-mode {background:#1a1a1a; color:#fff;}
 .dark-mode.card {background:#2d2d2d; color:#fff;}
 .dark-mode input,.dark-mode select {background:#3d3d3d; color:#fff; border-color:#555;}
-.modal {display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;}
-.modal-content {background:white; margin:10% auto; padding:20px; width:90%; max-width:500px; border-radius:12px;}
+.modal {display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;}
+.modal-content {background:white; margin:5% auto; padding:20px; width:90%; max-width:500px; border-radius:12px;}
 .dark-mode.modal-content {background:#2d2d2d;}
 hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
+.history-item {padding:8px; border-bottom:1px solid #eee; font-size:14px;}
+.history-deposit {color:#28a745;}
+.history-withdraw {color:#dc3545;}
+.history-loan {color:#17a2b8;}
+@media print {
+  body * {visibility:hidden;}
+  #receiptPrint, #receiptPrint * {visibility:visible;}
+  #receiptPrint {position:absolute; left:0; top:0; width:100%;}
 </style>
 </head>
 <body>
@@ -95,6 +105,14 @@ hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
       <button onclick="changePassword()">Update Password</button>
     </div>
 
+    <!-- Member Panel -->
+    <div class="card" id="memberPanel">
+      <h2>Change My Password</h2>
+      <input type="password" id="memberOldPass" placeholder="Old Password">
+      <input type="password" id="memberNewPass" placeholder="New Password">
+      <button onclick="changeMemberPassword()">Update Password</button>
+    </div>
+
     <!-- Members List -->
     <div class="card">
       <h2>Members</h2>
@@ -116,6 +134,29 @@ hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
     <button onclick="confirmTransaction()">Confirm</button>
     <button class="btn-secondary" onclick="closeModal()">Cancel</button>
   </div>
+</div>
+
+<!-- History Modal -->
+<div id="historyModal" class="modal">
+  <div class="modal-content">
+    <h2 id="historyTitle">Transaction History</h2>
+    <div id="historyList"></div>
+    <button class="btn-secondary" onclick="closeHistory()">Close</button>
+  </div>
+</div>
+
+<!-- Receipt Print Area -->
+<div id="receiptPrint" style="display:none; padding:20px; font-family:monospace;">
+  <h3 style="text-align:center;">VELASCO COOP</h3>
+  <p style="text-align:center;">Savings and Loan Receipt</p>
+  <hr>
+  <p id="receiptDate"></p>
+  <p id="receiptMember"></p>
+  <p id="receiptType"></p>
+  <p id="receiptAmount"></p>
+  <p id="receiptBalance"></p>
+  <hr>
+  <p style="text-align:center;">Thank You!</p>
 </div>
 
 <script>
@@ -159,8 +200,13 @@ function showApp() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('userBadge').innerHTML = `<span class="badge badge-${currentRole}">${currentRole.toUpperCase()}</span> ${currentUser}`;
-  if (currentRole!== 'admin') {
+  
+  if (currentRole === 'admin') {
+    document.getElementById('adminPanel').style.display = 'block';
+    document.getElementById('memberPanel').style.display = 'none';
+  } else {
     document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('memberPanel').style.display = 'block';
   }
   updateDashboard();
 }
@@ -187,7 +233,13 @@ function addMember() {
     return showToast('Member already exists!');
   }
 
-  members.push({name:name, password:name.toLowerCase(), savings:initial, loan:0});
+  members.push({
+    name:name, 
+    password:name.toLowerCase(), 
+    savings:initial, 
+    loan:0,
+    history:[]
+  });
   saveData();
   document.getElementById('memberName').value = '';
   document.getElementById('initialSaving').value = '0';
@@ -217,6 +269,29 @@ function changePassword() {
   document.getElementById('newPass').value = '';
 }
 
+function changeMemberPassword() {
+  if (currentRole!== 'member') return;
+  
+  const oldPass = document.getElementById('memberOldPass').value;
+  const newPass = document.getElementById('memberNewPass').value;
+  let member = members.find(m => m.name.toLowerCase() === currentUser.toLowerCase());
+  
+  if (member.password !== oldPass) {
+    return showToast('Wrong old password!');
+  }
+  
+  if (newPass.length < 4) {
+    return showToast('Password too short! Minimum 4 characters');
+  }
+  
+  member.password = newPass;
+  saveData();
+  showToast('Password updated successfully!');
+  
+  document.getElementById('memberOldPass').value = '';
+  document.getElementById('memberNewPass').value = '';
+}
+
 function updateDashboard() {
   document.getElementById('totalMembers').textContent = members.length;
   let totalSavings = members.reduce((sum, m) => sum + m.savings, 0);
@@ -228,6 +303,8 @@ function updateDashboard() {
   tbody.innerHTML = '';
   members.forEach((m, i) => {
     let canTransact = currentRole === 'admin';
+    let canViewHistory = currentRole === 'admin' || m.name.toLowerCase() === currentUser.toLowerCase();
+    
     tbody.innerHTML += `
       <tr>
         <td>${m.name}</td>
@@ -235,10 +312,12 @@ function updateDashboard() {
         <td>₱${m.loan.toLocaleString()}</td>
         <td>
           ${canTransact? `
-            <button onclick="openTrans(${i},'deposit')" style="width:auto; padding:5px 10px;">Deposit</button>
-            <button onclick="openTrans(${i},'withdraw')" style="width:auto; padding:5px 10px;" class="btn-secondary">Withdraw</button>
-            <button onclick="openTrans(${i},'loan')" style="width:auto; padding:5px 10px;" class="btn-secondary">Loan</button>
-          ` : '<span style="color:#666;">View Only</span>'}
+            <button onclick="openTrans(${i},'deposit')" class="btn-small">Deposit</button>
+            <button onclick="openTrans(${i},'withdraw')" class="btn-small btn-secondary">Withdraw</button>
+            <button onclick="openTrans(${i},'loan')" class="btn-small btn-secondary">Loan</button>
+          ` : ''}
+          ${canViewHistory? `<button onclick="viewHistory(${i})" class="btn-small btn-secondary">History</button>` : ''}
+          ${!canTransact && !canViewHistory? '<span style="color:#666;">View Only</span>' : ''}
         </td>
       </tr>
     `;
@@ -256,6 +335,8 @@ function confirmTransaction() {
   if (!amount || amount <= 0) return showToast('Enter valid amount!');
 
   let m = members[currentTrans.memberIndex];
+  let prevSavings = m.savings;
+  let prevLoan = m.loan;
 
   if (currentTrans.type === 'deposit') {
     m.savings += amount;
@@ -266,10 +347,58 @@ function confirmTransaction() {
     m.loan += amount;
   }
 
+  // Add to history
+  if (!m.history) m.history = [];
+  m.history.push({
+    date: new Date().toLocaleString(),
+    type: currentTrans.type,
+    amount: amount,
+    balance: {savings: m.savings, loan: m.loan}
+  });
+
   saveData();
   closeModal();
   updateDashboard();
   showToast('Transaction successful!');
+  
+  // Show print option
+  if(confirm('Print receipt?')) {
+    printReceipt(m, currentTrans.type, amount, m.savings, m.loan);
+  }
+}
+
+function printReceipt(member, type, amount, savings, loan) {
+  document.getElementById('receiptDate').textContent = 'Date: ' + new Date().toLocaleString();
+  document.getElementById('receiptMember').textContent = 'Member: ' + member.name;
+  document.getElementById('receiptType').textContent = 'Transaction: ' + type.toUpperCase();
+  document.getElementById('receiptAmount').textContent = 'Amount: ₱' + amount.toLocaleString();
+  document.getElementById('receiptBalance').textContent = `Balance - Savings: ₱${savings.toLocaleString()}, Loan: ₱${loan.toLocaleString()}`;
+  
+  document.getElementById('receiptPrint').style.display = 'block';
+  window.print();
+  document.getElementById('receiptPrint').style.display = 'none';
+}
+
+function viewHistory(index) {
+  let m = members[index];
+  document.getElementById('historyTitle').textContent = 'History - ' + m.name;
+  
+  let html = '';
+  if (!m.history || m.history.length === 0) {
+    html = '<p>No transactions yet.</p>';
+  } else {
+    m.history.slice().reverse().forEach(h => {
+      let cls = h.type === 'deposit' ? 'history-deposit' : h.type === 'withdraw' ? 'history-withdraw' : 'history-loan';
+      html += `<div class="history-item ${cls}">
+        <strong>${h.type.toUpperCase()}</strong> - ₱${h.amount.toLocaleString()}<br>
+        <small>${h.date}</small><br>
+        <small>Balance: S₱${h.balance.savings.toLocaleString()} | L₱${h.balance.loan.toLocaleString()}</small>
+      </div>`;
+    });
+  }
+  
+  document.getElementById('historyList').innerHTML = html;
+  document.getElementById('historyModal').style.display = 'block';
 }
 
 function closeModal() {
@@ -277,8 +406,13 @@ function closeModal() {
   document.getElementById('transAmount').value = '';
 }
 
+function closeHistory() {
+  document.getElementById('historyModal').style.display = 'none';
+}
+
 window.onclick = function(e) {
   if (e.target.id == 'modal') closeModal();
+  if (e.target.id == 'historyModal') closeHistory();
 }
 
 function toggleDarkMode() {

@@ -44,7 +44,7 @@ hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
   body * {visibility:hidden;} 
   #receiptPrint, #receiptPrint * {visibility:visible;} 
   #receiptPrint {position:absolute; left:0; top:0; width:100%;}
-} /* <- sinara ko na to */
+} 
 </style> 
 </head> 
 <body> 
@@ -335,7 +335,6 @@ function printReceipt(member, type, amount, savings, loan) {
  document.getElementById('receiptBalance').textContent = `Balance - Savings: ₱${savings.toLocaleString()}, Loan: ₱${loan.toLocaleString()}`; 
  document.getElementById('receiptPrint').style.display = 'block'; 
  window.print(); 
- // tinanggal ko yung display = 'none' dito
 } 
 
 function viewHistory(index) { 

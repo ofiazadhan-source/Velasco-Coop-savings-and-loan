@@ -40,10 +40,18 @@ hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
 .history-withdraw {color:#dc3545;} 
 .history-loan {color:#17a2b8;} 
 
+/* PRINT CSS - eto yung importante */
 @media print { 
   body * {visibility:hidden;} 
   #receiptPrint, #receiptPrint * {visibility:visible;} 
-  #receiptPrint {position:absolute; left:0; top:0; width:100%;}
+  #receiptPrint {
+    position:absolute; 
+    left:0; 
+    top:0; 
+    width:100%;
+    font-size:14px;
+    padding:20px;
+  }
 } 
 </style> 
 </head> 
@@ -334,7 +342,11 @@ function printReceipt(member, type, amount, savings, loan) {
  document.getElementById('receiptAmount').textContent = 'Amount: ₱' + amount.toLocaleString(); 
  document.getElementById('receiptBalance').textContent = `Balance - Savings: ₱${savings.toLocaleString()}, Loan: ₱${loan.toLocaleString()}`; 
  document.getElementById('receiptPrint').style.display = 'block'; 
- window.print(); 
+  
+ // Delay ng 500ms para sure na may laman na bago mag-print
+ setTimeout(() => {
+   window.print();
+ }, 500);
 } 
 
 function viewHistory(index) { 

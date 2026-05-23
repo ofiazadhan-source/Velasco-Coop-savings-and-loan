@@ -1,1 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VELASCO COOP Savings and Loan</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b35">
+<style>
+* {margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Arial, sans-serif;}
+body {background:#f5f5f5; color:#333;}
+.container {max-width:1000px; margin:20px auto; padding:20px;}
+.card {background:#fff; border-radius:12px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+h1 {text-align:center; color:#ff6b35; margin-bottom:20px;}
+h2 {color:#ff6b35; margin-bottom:15px;}
+h3 {color:#333; margin:15px 0 10px;}
+input, select, button {width:100%; padding:12px; margin:8px 0; border:1px solid #ddd; border-radius:8px; font-size:16px;}
+button {background:#ff6b35; color:white; border:none; cursor:pointer; font-weight:bold;}
+button:hover {background:#e55a2b;}
+.btn-secondary {background:#666;}
+.btn-danger {background:#dc3545;}
+.btn-small {width:auto; padding:5px 10px; font-size:14px;}
+table {width:100%; border-collapse:collapse; margin-top:15px;}
+th, td {padding:12px; text-align:left; border-bottom:1px solid #ddd;}
+th {background:#ff6b35; color:white;}
+.badge {padding:4px 12px; border-radius:20px; font-size:12px; font-weight:bold;}
+.badge-admin {background:#ff6b35; color:white;}
+.badge-member {background:#28a745; color:white;}
+.login-box {max-width:400px; margin:100px auto;}
+.hidden {display:none;}
+.dark-mode {background:#1a1a1a; color:#fff;}
+.dark-mode.card {background:#2d2d2d; color:#fff;}
+.dark-mode input,.dark-mode select {background:#3d3d3d; color:#fff; border-color:#555;}
+.modal {display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;}
+.modal-content {background:white; margin:5% auto; padding:20px; width:90%; max-width:500px; border-radius:12px;}
+.dark-mode.modal-content {background:#2d2d2d;}
+hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
+.history-item {padding:8px; border-bottom:1px solid #eee; font-size:14px;}
+.history-deposit {color:#28a745;}
+.history-withdraw {color:#dc3545;}
+.history-loan {color:#17a2b8;}
+@media print {
+body * {visibility:hidden;}
+#receiptPrint, #receiptPrint * {visibility:visible;}
+#receiptPrint { position:absolute; left:0; top:0; width:100%; font-size:14px; padding:20px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<!-- Login Screen -->
+<div id="loginScreen" class="login-box card">
+<h1>🏦 VELASCO COOP<br>SAVINGS AND LOAN</h1>
+<h2>Login</h2>
+<input type="text" id="username" placeholder="Username" value="admin">
+<input type="password" id="password" placeholder="Password">
+<button onclick="login()">Login</button>
+<button class="btn-secondary" onclick="toggleDarkMode()">🌙 Toggle Dark Mode</button>
+<p style="margin-top:15px; font-size:14px; color:#666;">
+Admin: password <strong>velasco123</strong><br>
+Member: use your name as password
+</p>
+</div>
 
+<!-- Main App -->
+<div id="app" class="hidden">
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+<h1>🏦 VELASCO COOP</h1>
+<div>
+<span id="userBadge"></span>
+<button onclick="logout()" style="width:auto; padding:8px 15px; margin-left:10px;">Logout</button>
+</div>
+</div>
+
+<!-- Dashboard -->
+<div class="card">
+<h2>Dashboard</h2>
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
+<div style="background:#ff6b35; color:white; padding:15px; border-radius:8px;">
+<div>Total Members</div>
+<h2 id="totalMembers">0</h2>
+</div>
+<div style="background:#28a745; color:white; padding:15px; border-radius:8px;">
+<div>Total Savings</div>
+<h2 id="totalSavings">₱0</h2>
+</div>
+<div style="background:#17a2b8; color:white; padding:15px; border-radius:8px;">
+<div>Total Loans</div>
+<h2 id="totalLoans">₱0</h2>
+</div>
+<div style="background:#6f42c1; color:white; padding:15px; border-radius:8px;">
+<div>Total Funds</div>
+<h2 id="totalFunds">₱0</h2>
+</div>
+</div>
+</div>
+
+<!-- Admin Panel -->
+<div class="card" id="adminPanel">
+<h2>Add New Member</h2>
+<input type="text" id="memberName" placeholder="Member Name">
+<input type="number" id="initialSaving" placeholder="Initial Saving Amount" value="0">
+<button onclick="addMember()">Add Member</button>
+<hr>
+<h2>Change Admin Password</h2>
+<input type="password" id="oldPass" placeholder="Old Password">
+<input type="password" id="newPass" placeholder="New Password">
+<button onclick="changePassword()">Update Password</button>
+</div>
+
+<!-- Member Panel -->
+<div class="card" id="memberPanel">
+<h2>Change My Password</h2>
+<input type="password" id="memberOldPass" placeholder="Old Password">
+<input type="password" id="memberNewPass" placeholder="New Password">
+<button onclick="changeMemberPassword()">Update Password</button>
+</div>
+
+<!-- Members List -->
+<div class="card">
+<h2>Members</h2>
+<table id="membersTable">
+<thead>
+<tr><th>Name</th><th>Savings</th><th>Loan</th><th>Actions</th></tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- Transaction Modal -->
+<div id="modal" class="modal">
+<div class="modal-content">
+<h2 id="modalTitle">Transaction</h2>
+<input type="number" id="transAmount" placeholder="Amount">
+<button onclick="confirmTransaction()">Confirm</button>
+<button class="btn-secondary" onclick="closeModal()">Cancel</button>
+</div>
+</div>
+
+<!-- History Modal -->
+<div id="historyModal" class="modal">
+<div class="modal-content">
+<h2 id="historyTitle">Transaction History</h2>
+<div id="historyList"></div>
+<button class="btn-secondary" onclick="closeHistory()">Close</button>
+</div>
+</div>
+
+<!-- Receipt Print Area -->
+<div id="receiptPrint" style="display:none; padding:20px; font-family:monospace;">
+<h3 style="text-align:center;">VELASCO COOP</h3>
+<p style="text-align:center;">Savings and Loan Receipt</p>
+<hr>
+<p id="receiptDate"></p>
+<p id="receiptMember"></p>
+<p id="receiptType"></p>
+<p id="receiptAmount"></p>
+<p id="receiptBalance"></p>
+<hr>
+<p style="text-align:center;">Thank You!</p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+apiKey: "AIzaSyDk3ZbOXuw3PEfJzdt8AI2ueJq5yksfekE",
+authDomain: "dhan-siomai-pos-fe1e5.firebaseapp.com",
+projectId: "dhan-siomai-pos-fe1e5",
+storageBucket: "dhan-siomai-pos-fe1e5.firebasestorage.app",
+messagingSenderId: "305932123173",
+appId: "1:305932123173:web:f27894a2d5e6e6ab8253cc"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let members = [];
+let currentUser = null;
+let currentRole = null;
+let currentTrans = {memberId:null, type:null};
+let adminPass = 'velasco123';
+
+function login() {
+const username = document.getElementById('username').value.trim();
+const password = document.getElementById('password').value.trim();
+
+if (username === 'admin' && password === adminPass) {
+currentUser = 'admin';
+currentRole = 'admin';
+showApp();
+showToast('Welcome Admin!');
+return;
+}
+
+db.collection('coop_members').where('name', '==', username).where('password', '==', password).get()
+.then(snap => {
+if (!snap.empty) {
+currentUser = username;
+currentRole = 'member';
+showApp();
+showToast('Welcome ' + username + '!');
+} else {
+showToast('Invalid credentials!');
+}
+});
+}
+
+function showApp() {
+document.getElementById('loginScreen').style.display = 'none';
+document.getElementById('app').classList.remove('hidden');
+document.getElementById('userBadge').innerHTML = `<span class="badge badge-${currentRole}">${currentRole.toUpperCase()}</span> ${currentUser}`;
+
+if (currentRole === 'admin') {
+document.getElementById('adminPanel').style.display = 'block';
+document.getElementById('memberPanel').style.display = 'none';
+} else {
+document.getElementById('adminPanel').style.display = 'none';
+document.getElementById('memberPanel').style.display = 'block';
+}
+loadMembers();
+}
+
+function logout() {
+currentUser = null;
+currentRole = null;
+location.reload();
+}
+
+function loadMembers() {
+db.collection('coop_members').get().then(snap => {
+members = [];
+snap.forEach(doc => {
+members.push({id: doc.id, ...doc.data()});
+updateDashboard();
+});
+}
+
+function addMember() {
+if (currentRole !== 'admin') return;
+const name = document.getElementById('memberName').value.trim();
+const initial = parseFloat(document.getElementById('initialSaving').value) || 0;
+
+if (!name) return showToast('Enter member name!');
+
+db.collection('coop_members').where('name', '==', name).get().then(snap => {
+if (!snap.empty) return showToast('Member already exists!');
+
+db.collection('coop_members').add({
+name: name,
+password: name.toLowerCase(),
+savings: initial,
+loan: 0,
+history: []
+}).then(() => {
+document.getElementById('memberName').value = '';
+document.getElementById('initialSaving').value = '0';
+loadMembers();
+showToast('Member added!');
+});
+}
+
+function changePassword() {
+if (currentRole !== 'admin') return;
+const oldPass = document.getElementById('oldPass').value;
+const newPass = document.getElementById('newPass').value;
+
+if (oldPass !== adminPass) return showToast('Wrong old password!');
+if (newPass.length < 4) return showToast('Password too short! Minimum 4 characters');
+
+adminPass = newPass;
+showToast('Password updated! Edit mo sa code for now.');
+document.getElementById('oldPass').value = '';
+document.getElementById('newPass').value = '';
+}
+
+function changeMemberPassword() {
+if (currentRole !== 'member') return;
+const oldPass = document.getElementById('memberOldPass').value;
+const newPass = document.getElementById('memberNewPass').value;
+
+db.collection('coop_members').where('name', '==', currentUser).get().then(snap => {
+if (snap.empty) return;
+let doc = snap.docs[0];
+let member = doc.data();
+
+if (member.password !== oldPass) return showToast('Wrong old password!');
+if (newPass.length < 4) return showToast('Password too short!');
+
+db.collection('coop_members').doc(doc.id).update({password: newPass})
+.then(() => {
+showToast('Password updated successfully!');
+document.getElementById('memberOldPass').value = '';
+document.getElementById('memberNewPass').value = '';
+});
+}
+
+function updateDashboard() {
+document.getElementById('totalMembers').textContent = members.length;
+let totalSavings = members.reduce((sum, m) => sum + (m.savings || 0), 0);
+let totalLoans = members.reduce((sum, m) => sum + (m.loan || 0), 0);
+let totalFunds = totalSavings + totalLoans;
+
+document.getElementById('totalSavings').textContent = '₱' + totalSavings.toLocaleString();
+document.getElementById('totalLoans').textContent = '₱' + totalLoans.toLocaleString();
+document.getElementById('totalFunds').textContent = '₱' + totalFunds.toLocaleString();
+
+let tbody = document.querySelector('#membersTable tbody');
+tbody.innerHTML = '';
+
+members.forEach((m) => {
+let canTransact = currentRole === 'admin';
+let canViewHistory = currentRole === 'admin' || m.name.toLowerCase() === currentUser.toLowerCase();
+
+tbody.innerHTML += `
+<tr>
+<td>${m.name}</td>
+<td>₱${(m.savings || 0).toLocaleString()}</td>
+<td>₱${(m.loan || 0).toLocaleString()}</td>
+<td>
+${canTransact ? `
+<button onclick="openTrans('${m.id}','deposit')" class="btn-small">Deposit</button>
+<button onclick="openTrans('${m.id}','withdraw')" class="btn-small btn-secondary">Withdraw</button>
+<button onclick="openTrans('${m.id}','loan')" class="btn-small btn-secondary">Loan</button>
+` : ''}
+${canViewHistory ? `<button onclick="viewHistory('${m.id}')" class="btn-small btn-secondary">History</button>` : ''}
+</td>
+</tr>
+`;
+});
+}
+
+function openTrans(memberId, type) {
+currentTrans = {memberId: memberId, type: type};
+let member = members.find(m => m.id === memberId);
+document.getElementById('modalTitle').textContent = type.charAt(0).toUpperCase() + type.slice(1) + ' - ' + member.name;
+document.getElementById('modal').style.display = 'block';
+}
+
+function confirmTransaction() {
+let amount = parseFloat(document.getElementById('transAmount').value);
+if (!amount || amount <= 0) return showToast('Enter valid amount!');
+
+let memberRef = db.collection('coop_members').doc(currentTrans.memberId);
+memberRef.get().then(doc => {
+let m = doc.data();
+let updateData = {};
+let historyEntry = {
+date: new Date().toLocaleString(),
+type: currentTrans.type,
+amount: amount
+};
+
+if (currentTrans.type === 'deposit') {
+updateData.savings = (m.savings || 0) + amount;
+historyEntry.balance = {savings: updateData.savings, loan: m.loan || 0};
+} else if (currentTrans.type === 'withdraw') {
+if ((m.savings || 0) < amount) return showToast('Insufficient savings!');
+updateData.savings = (m.savings || 0) - amount;
+historyEntry.balance = {savings: updateData.savings, loan: m.loan || 0};
+} else if (currentTrans.type === 'loan') {
+updateData.loan = (m.loan || 0) + amount;
+historyEntry.balance = {savings: m.savings || 0, loan: updateData.loan};
+}
+
+let history = m.history || [];
+history.push(historyEntry);
+updateData.history = history;
+
+memberRef.update(updateData).then(() => {
+closeModal();
+loadMembers();
+showToast('Transaction successful!');
+if(confirm('Print receipt?')) {
+printReceipt(m, currentTrans.type, amount, updateData.savings || m.savings, updateData.loan || m.loan);
+}
+});
+}
+
+function printReceipt(member, type, amount, savings, loan) {
+document.getElementById('receiptDate').textContent = 'Date: ' + new Date().toLocaleString();
+document.getElementById('receiptMember').textContent = 'Member: ' + member.name;
+document.getElementById('receiptType').textContent = 'Transaction: ' + type.toUpperCase();
+document.getElementById('receiptAmount').textContent = 'Amount: ₱' + amount.toLocaleString();
+document.getElementById('receiptBalance').textContent = `Balance - Savings: ₱${savings.toLocaleString()}, Loan: ₱${loan.toLocaleString()}`;
+document.getElementById('receiptPrint').style.display = 'block';
+
+setTimeout(() => {
+window.print();
+}, 500);
+}
+
+function viewHistory(memberId) {
+let m = members.find(m => m.id === memberId);
+document.getElementById('historyTitle').textContent = 'History - ' + m.name;
+
+let html = '';
+if (!m.history || m.history.length === 0) {
+html = '<p>No transactions yet.</p>';
+} else {
+m.history.slice().reverse().forEach(h => {
+let cls = h.type === 'deposit' ? 'history-deposit' : h.type === 'withdraw' ? 'history-withdraw' : 'history-loan';
+html += `<div class="history-item ${cls}">
+<strong>${h.type.toUpperCase()}</strong> - ₱${h.amount.toLocaleString()}<br>
+<small>${h.date}</small><br>
+<small>Balance: S₱${h.balance.savings.toLocaleString()} | L₱${h.balance.loan.toLocaleString()}</small>
+</div>`;
+});
+}
+document.getElementById('historyList').innerHTML = html;
+document.getElementById('historyModal').style.display = 'block';
+}
+
+function closeModal() {
+document.getElementById('modal').style.display = 'none';
+document.getElementById('transAmount').value = '';
+}
+
+function closeHistory() {
+document.getElementById('historyModal').style.display = 'none';
+}
+
+window.onclick = function(e) {
+if (e.target.id == 'modal') closeModal();
+if (e.target.id == 'historyModal') closeHistory();
+}
+
+function toggleDarkMode() {
+document.body.classList.toggle('dark-mode');
+}
+
+function showToast(msg) {
+alert(msg);
+}
+</script>
+</body>
+</html>

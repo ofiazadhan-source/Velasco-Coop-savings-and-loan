@@ -29,11 +29,11 @@ th {background:#d84315; color:white;}
 .login-box {max-width:400px; margin:100px auto;}
 .hidden {display:none;}
 .dark-mode {background:#1a1a1a; color:#fff;}
-.dark-mode.card {background:#2d2d2d; color:#fff;}
+.dark-mode .card {background:#2d2d2d; color:#fff;}
 .dark-mode input,.dark-mode select {background:#3d3d3d; color:#fff; border-color:#555;}
 .modal {display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;}
 .modal-content {background:white; margin:5% auto; padding:20px; width:90%; max-width:500px; border-radius:12px;}
-.dark-mode.modal-content {background:#2d2d2d;}
+.dark-mode .modal-content {background:#2d2d2d;}
 hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
 .history-item {padding:8px; border-bottom:1px solid #eee; font-size:14px;}
 .history-deposit {color:#28a745;}
@@ -57,7 +57,7 @@ hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
     <button onclick="login()">Login</button>
     <button class="btn-secondary" onclick="toggleDarkMode()">🌙 Toggle Dark Mode</button>
     <p style="margin-top:15px; font-size:14px; color:#666;">
-      Admin: password <strong></strong><br>
+      Admin: password <strong>Dhan3426@#</strong><br>
       Member: use your name as password
     </p>
   </div>
@@ -101,15 +101,25 @@ hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
       <input type="text" id="memberName" placeholder="Member Name">
       <input type="number" id="initialSaving" placeholder="Initial Saving Amount" value="0">
       <button onclick="addMember()">Add Member</button>
+      
       <hr>
       <h2>Change Admin Password</h2>
       <input type="password" id="oldPass" placeholder="Old Password">
       <input type="password" id="newPass" placeholder="New Password">
       <button onclick="changePassword()">Update Password</button>
+
+      <hr>
+      <h2>Pending Gcash Payments</h2>
+      <div id="pendingList"></div>
     </div>
 
     <!-- Member Panel -->
     <div class="card" id="memberPanel" style="display:none;">
+      <h2>Member Actions</h2>
+      <button onclick="openMemberGcash('deposit')" id="gcashDepositBtn">💰 Deposit via Gcash</button>
+      <button onclick="openMemberGcash('loan_payment')" id="gcashLoanBtn" style="display:none;">💳 Pay Loan via Gcash</button>
+      
+      <hr>
       <h2>Change My Password</h2>
       <input type="password" id="memberOldPass" placeholder="Old Password">
       <input type="password" id="memberNewPass" placeholder="New Password">
@@ -134,6 +144,15 @@ hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
   <div class="modal-content">
     <h2 id="modalTitle">Transaction</h2>
     <input type="number" id="transAmount" placeholder="Amount">
+    
+    <select id="paymentMethod" style="display:none;">
+      <option value="Cash">Cash</option>
+      <option value="Gcash">Gcash</option>
+    </select>
+    
+    <input type="text" id="referenceNumber" placeholder="Gcash Reference No." style="display:none;">
+    <small id="gcashNote" style="display:none; color:#666;">I-upload mo proof sa Gcash app, tapos ilagay mo dito ref no.</small>
+    
     <button onclick="confirmTransaction()">Confirm</button>
     <button class="btn-secondary" onclick="closeModal()">Cancel</button>
   </div>
@@ -158,6 +177,7 @@ hr {border:none; border-top:1px solid #ddd; margin:20px 0;}
   <p id="receiptType"></p>
   <p id="receiptAmount"></p>
   <p id="receiptBalance"></p>
+  <p id="receiptMethod"></p>
   <hr>
   <p style="text-align:center;">Thank You!</p>
 </div>
@@ -195,7 +215,8 @@ function login() {
     return;
   }
 
-  db.collection('coop_members').where('name', '==', username).where('password', '==', password).get()
+  db.collection('coop_members').where('name', '==', username).where('password', '==', password)
+  .get()
 .then(snap => {
     if (!snap.empty) {
       currentUser = username;
@@ -206,6 +227,9 @@ function login() {
     } else {
       showToast('Invalid credentials!');
     }
+  })
+.catch(err => {
+    showToast('Login error: ' + err.message);
   });
 }
 
@@ -219,6 +243,7 @@ function showApp() {
     document.getElementById('memberPanel').style.display = 'none';
     document.getElementById('membersCard').style.display = 'block';
     loadMembers();
+    loadPendingTransactions();
   } else {
     document.getElementById('adminPanel').style.display = 'none';
     document.getElementById('memberPanel').style.display = 'block';
@@ -228,20 +253,35 @@ function showApp() {
   }
 }
 
-function logout() {
-  currentUser = null;
-  currentRole = null;
-  currentUserData = null;
-  location.reload();
-}
-
 function loadMembers() {
   db.collection('coop_members').get().then(snap => {
     members = [];
+    let totalSavings = 0, totalLoans = 0;
     snap.forEach(doc => {
-      members.push({id: doc.id,...doc.data()});
+      let m = {id: doc.id,...doc.data()};
+      members.push(m);
+      totalSavings += m.savings || 0;
+      totalLoans += m.loan || 0;
     });
-    updateDashboardAdmin();
+    document.getElementById('totalMembers').textContent = members.length;
+    document.getElementById('totalSavings').textContent = '₱' + totalSavings.toLocaleString();
+    document.getElementById('totalLoans').textContent = '₱' + totalLoans.toLocaleString();
+    document.getElementById('totalFunds').textContent = '₱' + (totalSavings + totalLoans).toLocaleString();
+
+    let html = '';
+    members.forEach(m => {
+      html += `<div class="member-card">
+        <h3>${m.name}</h3>
+        <p>Savings: ₱${(m.savings || 0).toLocaleString()}</p>
+        <p>Loan: ₱${(m.loan || 0).toLocaleString()}</p>
+        <button onclick="openTrans('${m.id}', 'deposit')" class="btn-small">Deposit</button>
+        <button onclick="openTrans('${m.id}', 'withdraw')" class="btn-small">Withdraw</button>
+        <button onclick="openTrans('${m.id}', 'loan')" class="btn-small">Loan</button>
+        <button onclick="openTrans('${m.id}', 'loan_payment')" class="btn-small">Pay Loan</button>
+        <button onclick="viewHistory('${m.id}')" class="btn-small btn-secondary">History</button>
+      </div>`;
+    });
+    document.getElementById('membersList').innerHTML = html;
   });
 }
 
@@ -249,34 +289,6 @@ function loadMemberData() {
   db.collection('coop_members').doc(currentUserData.id).get().then(doc => {
     currentUserData = {id: doc.id,...doc.data()};
     updateDashboardMember();
-  });
-}
-
-function updateDashboardAdmin() {
-  document.getElementById('totalMembers').textContent = members.length;
-  let totalSavings = members.reduce((sum, m) => sum + (m.savings || 0), 0);
-  let totalLoans = members.reduce((sum, m) => sum + (m.loan || 0), 0);
-  let totalFunds = totalSavings + totalLoans;
-
-  document.getElementById('totalSavings').textContent = '₱' + totalSavings.toLocaleString();
-  document.getElementById('totalLoans').textContent = '₱' + totalLoans.toLocaleString();
-  document.getElementById('totalFunds').textContent = '₱' + totalFunds.toLocaleString();
-
-  let tbody = document.querySelector('#membersTable tbody');
-  tbody.innerHTML = '';
-  members.forEach((m) => {
-    tbody.innerHTML += `
-      <tr>
-        <td>${m.name}</td>
-        <td>₱${(m.savings || 0).toLocaleString()}</td>
-        <td>₱${(m.loan || 0).toLocaleString()}</td>
-        <td>
-          <button onclick="openTrans('${m.id}','deposit')" class="btn-small">Deposit</button>
-          <button onclick="openTrans('${m.id}','withdraw')" class="btn-small btn-secondary">Withdraw</button>
-          <button onclick="openTrans('${m.id}','loan')" class="btn-small btn-secondary">Loan</button>
-          <button onclick="viewHistory('${m.id}')" class="btn-small btn-secondary">History</button>
-        </td>
-      </tr>`;
   });
 }
 
@@ -289,118 +301,159 @@ function updateDashboardMember() {
   document.getElementById('totalSavings').textContent = '₱' + (currentUserData.savings || 0).toLocaleString();
   document.getElementById('totalLoans').textContent = '₱' + (currentUserData.loan || 0).toLocaleString();
   document.getElementById('totalFunds').textContent = '₱' + ((currentUserData.savings || 0) + (currentUserData.loan || 0)).toLocaleString();
-}
-
-function addMember() {
-  if (currentRole!== 'admin') return;
-  const name = document.getElementById('memberName').value.trim();
-  const initial = parseFloat(document.getElementById('initialSaving').value) || 0;
-  if (!name) return showToast('Enter member name!');
-
-  db.collection('coop_members').where('name', '==', name).get().then(snap => {
-    if (!snap.empty) return showToast('Member already exists!');
-    db.collection('coop_members').add({
-      name: name,
-      password: name.toLowerCase(),
-      savings: initial,
-      loan: 0,
-      history: []
-    }).then(() => {
-      document.getElementById('memberName').value = '';
-      document.getElementById('initialSaving').value = '0';
-      loadMembers();
-      showToast('Member added!');
-    });
-  });
-}
-
-function changePassword() {
-  if (currentRole!== 'admin') return;
-  const oldPass = document.getElementById('oldPass').value;
-  const newPass = document.getElementById('newPass').value;
-  if (oldPass!== adminPass) return showToast('Wrong old password!');
-  if (newPass.length < 4) return showToast('Password too short! Minimum 4 characters');
-  adminPass = newPass;
-  showToast('Password updated! Edit mo sa code for now.');
-  document.getElementById('oldPass').value = '';
-  document.getElementById('newPass').value = '';
-}
-
-function changeMemberPassword() {
-  if (currentRole!== 'member') return;
-  const oldPass = document.getElementById('memberOldPass').value;
-  const newPass = document.getElementById('memberNewPass').value;
-
-  if (currentUserData.password!== oldPass) return showToast('Wrong old password!');
-  if (newPass.length < 4) return showToast('Password too short!');
-
-  db.collection('coop_members').doc(currentUserData.id).update({password: newPass})
-.then(() => {
-    currentUserData.password = newPass;
-    showToast('Password updated successfully!');
-    document.getElementById('memberOldPass').value = '';
-    document.getElementById('memberNewPass').value = '';
-  });
+  document.getElementById('gcashLoanBtn').style.display = (currentUserData.loan > 0)? 'block' : 'none';
 }
 
 function openTrans(memberId, type) {
   currentTrans = {memberId: memberId, type: type};
   let member = members.find(m => m.id === memberId);
   document.getElementById('modalTitle').textContent = type.charAt(0).toUpperCase() + type.slice(1) + ' - ' + member.name;
+  document.getElementById('paymentMethod').style.display = (type === 'deposit' || type === 'loan_payment')? 'block' : 'none';
   document.getElementById('modal').style.display = 'block';
 }
 
+function openMemberGcash(type) {
+  currentTrans = {memberId: currentUserData.id, type: type};
+  if(type === 'loan_payment' && currentUserData.loan <= 0) {
+    showToast('Wala kang loan na babayaran');
+    return;
+  }
+  let title = type === 'deposit'? 'Deposit via Gcash' : 'Pay Loan via Gcash';
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('paymentMethod').value = 'Gcash';
+  document.getElementById('paymentMethod').style.display = 'none';
+  document.getElementById('referenceNumber').style.display = 'block';
+  document.getElementById('gcashNote').style.display = 'block';
+  document.getElementById('modal').style.display = 'block';
+}
+
+document.getElementById('paymentMethod').addEventListener('change', function() {
+  if(this.value === 'Gcash') {
+    document.getElementById('referenceNumber').style.display = 'block';
+    document.getElementById('gcashNote').style.display = 'block';
+  } else {
+    document.getElementById('referenceNumber').style.display = 'none';
+    document.getElementById('gcashNote').style.display = 'none';
+  }
+});
+
 function confirmTransaction() {
   let amount = parseFloat(document.getElementById('transAmount').value);
+  let method = document.getElementById('paymentMethod').value;
+  let refNo = document.getElementById('referenceNumber').value.trim();
+
   if (!amount || amount <= 0) return showToast('Enter valid amount!');
+  if (method === 'Gcash' &&!refNo) return showToast('Enter Gcash reference number!');
 
   let memberRef = db.collection('coop_members').doc(currentTrans.memberId);
+  let historyEntry = {
+    date: new Date().toLocaleString(),
+    type: currentTrans.type,
+    amount: amount,
+    method: method,
+    reference: refNo || 'N/A',
+    status: method === 'Gcash'? 'pending' : 'approved'
+  };
+
+  if (method === 'Cash') {
+    memberRef.get().then(doc => {
+      let m = doc.data();
+      let updateData = {};
+      if (currentTrans.type === 'deposit') {
+        updateData.savings = (m.savings || 0) + amount;
+      } else if (currentTrans.type === 'withdraw') {
+        if ((m.savings || 0) < amount) return showToast('Insufficient savings!');
+        updateData.savings = (m.savings || 0) - amount;
+      } else if (currentTrans.type === 'loan') {
+        updateData.loan = (m.loan || 0) + amount;
+      } else if (currentTrans.type === 'loan_payment') {
+        if ((m.loan || 0) < amount) return showToast('Hindi pwede mas malaki sa loan mo!');
+        updateData.loan = (m.loan || 0) - amount;
+      }
+      let history = m.history || [];
+      history.push({...historyEntry, balance: {...m,...updateData}});
+      updateData.history = history;
+      memberRef.update(updateData).then(() => {
+        closeModal();
+        if(currentRole === 'admin') loadMembers(); else loadMemberData();
+        showToast('Transaction successful!');
+      });
+    });
+  } else {
+    memberRef.update({
+      pendingTransactions: firebase.firestore.FieldValue.arrayUnion(historyEntry)
+    }).then(() => {
+      closeModal();
+      showToast('Gcash payment submitted! Hintayin mo approval ni admin.');
+    });
+  }
+}
+
+function loadPendingTransactions() {
+  db.collection('coop_members').get().then(snap => {
+    let html = '';
+    snap.forEach(doc => {
+      let m = doc.data();
+      if(m.pendingTransactions && m.pendingTransactions.length > 0) {
+        m.pendingTransactions.forEach((p, index) => {
+          html += `<div style="border:1px solid #ddd; padding:10px; margin:10px 0; border-radius:8px;">
+            <strong>${m.name}</strong><br>
+            ${p.type === 'deposit'? 'Deposit' : 'Loan Payment'} - ₱${p.amount.toLocaleString()}<br>
+            Ref No: <b>${p.reference}</b><br>
+            <small>${p.date}</small><br>
+            <button onclick="approvePayment('${doc.id}', ${index})" class="btn-small">Approve</button>
+            <button onclick="rejectPayment('${doc.id}', ${index})" class="btn-small btn-danger">Reject</button>
+          </div>`;
+        });
+      }
+    });
+    document.getElementById('pendingList').innerHTML = html || '<p>Walang pending payment.</p>';
+  });
+}
+
+function approvePayment(memberId, index) {
+  let memberRef = db.collection('coop_members').doc(memberId);
   memberRef.get().then(doc => {
     let m = doc.data();
+    let pending = m.pendingTransactions[index];
     let updateData = {};
-    let historyEntry = { date: new Date().toLocaleString(), type: currentTrans.type, amount: amount };
-
-    if (currentTrans.type === 'deposit') {
-      updateData.savings = (m.savings || 0) + amount;
-      historyEntry.balance = {savings: updateData.savings, loan: m.loan || 0};
-    } else if (currentTrans.type === 'withdraw') {
-      if ((m.savings || 0) < amount) return showToast('Insufficient savings!');
-      updateData.savings = (m.savings || 0) - amount;
-      historyEntry.balance = {savings: updateData.savings, loan: m.loan || 0};
-    } else if (currentTrans.type === 'loan') {
-      updateData.loan = (m.loan || 0) + amount;
-      historyEntry.balance = {savings: m.savings || 0, loan: updateData.loan};
+    if(pending.type === 'deposit') {
+      updateData.savings = (m.savings || 0) + pending.amount;
+    } else if(pending.type === 'loan_payment') {
+      if((m.loan || 0) < pending.amount) return showToast('Loan amount mas maliit na sa payment.');
+      updateData.loan = (m.loan || 0) - pending.amount;
     }
-
+    pending.status = 'approved';
+    pending.approvedBy = 'admin';
+    pending.approvedDate = new Date().toLocaleString();
     let history = m.history || [];
-    history.push(historyEntry);
+    history.push({...pending, balance: {...m,...updateData}});
     updateData.history = history;
-
+    m.pendingTransactions.splice(index, 1);
+    updateData.pendingTransactions = m.pendingTransactions;
     memberRef.update(updateData).then(() => {
-      closeModal();
-      if(currentRole === 'admin') loadMembers(); else loadMemberData();
-      showToast('Transaction successful!');
-      if(confirm('Print receipt?')) {
-        printReceipt(m, currentTrans.type, amount, updateData.savings || m.savings, updateData.loan || m.loan);
-      }
+      loadMembers();
+      loadPendingTransactions();
+      showToast('Payment approved!');
     });
   });
 }
 
-function printReceipt(member, type, amount, savings, loan) {
-  document.getElementById('receiptDate').textContent = 'Date: ' + new Date().toLocaleString();
-  document.getElementById('receiptMember').textContent = 'Member: ' + member.name;
-  document.getElementById('receiptType').textContent = 'Transaction: ' + type.toUpperCase();
-  document.getElementById('receiptAmount').textContent = 'Amount: ₱' + amount.toLocaleString();
-  document.getElementById('receiptBalance').textContent = `Balance - Savings: ₱${savings.toLocaleString()}, Loan: ₱${loan.toLocaleString()}`;
-  document.getElementById('receiptPrint').style.display = 'block';
-  setTimeout(() => { window.print(); }, 500);
+function rejectPayment(memberId, index) {
+  let memberRef = db.collection('coop_members').doc(memberId);
+  memberRef.get().then(doc => {
+    let m = doc.data();
+    m.pendingTransactions.splice(index, 1);
+    memberRef.update({pendingTransactions: m.pendingTransactions}).then(() => {
+      loadPendingTransactions();
+      showToast('Payment rejected.');
+    });
+  });
 }
 
 function viewHistory(memberId) {
   let m = members.find(m => m.id === memberId);
   if(currentRole === 'member') m = currentUserData;
-
   document.getElementById('historyTitle').textContent = 'History - ' + m.name;
   let html = '';
   if (!m.history || m.history.length === 0) {
@@ -411,6 +464,9 @@ function viewHistory(memberId) {
       html += `<div class="history-item ${cls}">
         <strong>${h.type.toUpperCase()}</strong> - ₱${h.amount.toLocaleString()}<br>
         <small>${h.date}</small><br>
+        <small>Method: ${h.method || 'N/A'}</small><br>
+        <small>Ref: ${h.reference || 'N/A'}</small><br>
+        <small>Status: ${h.status || 'approved'}</small><br>
         <small>Balance: S₱${h.balance.savings.toLocaleString()} | L₱${h.balance.loan.toLocaleString()}</small>
       </div>`;
     });
@@ -422,19 +478,39 @@ function viewHistory(memberId) {
 function closeModal() {
   document.getElementById('modal').style.display = 'none';
   document.getElementById('transAmount').value = '';
+  document.getElementById('referenceNumber').value = '';
+  document.getElementById('paymentMethod').style.display = 'none';
+  document.getElementById('referenceNumber').style.display = 'none';
+  document.getElementById('gcashNote').style.display = 'none';
 }
+
 function closeHistory() {
   document.getElementById('historyModal').style.display = 'none';
 }
+
 window.onclick = function(e) {
   if (e.target.id == 'modal') closeModal();
   if (e.target.id == 'historyModal') closeHistory();
 }
+
 function toggleDarkMode() {
   document.body.classList.toggle('dark-mode');
 }
+
 function showToast(msg) {
   alert(msg);
+}
+
+function changeMemberPassword() {
+  let oldPass = document.getElementById('memberOldPass').value;
+  let newPass = document.getElementById('memberNewPass').value;
+  if(!oldPass ||!newPass) return showToast('Fill both fields!');
+  if(oldPass!== currentUserData.password) return showToast('Old password incorrect!');
+  db.collection('coop_members').doc(currentUserData.id).update({password: newPass}).then(() => {
+    showToast('Password updated!');
+    document.getElementById('memberOldPass').value = '';
+    document.getElementById('memberNewPass').value = '';
+  });
 }
 </script>
 </body>
